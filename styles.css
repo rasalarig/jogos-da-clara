@@ -1,0 +1,117 @@
+:root {
+  --sky-top: #8fd3ff;
+  --sky-bottom: #f4f9ff;
+  --hud-bg: rgba(18, 29, 42, 0.72);
+  --hud-border: rgba(255, 255, 255, 0.3);
+  --text: #f7fbff;
+  --hotbar-slot: rgba(9, 17, 28, 0.65);
+  --hotbar-selected: #ffd166;
+  --shadow: rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: "Press Start 2P", monospace;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.45), transparent 24%),
+    radial-gradient(circle at 85% 5%, rgba(255, 255, 255, 0.3), transparent 18%),
+    linear-gradient(180deg, var(--sky-top), var(--sky-bottom));
+  overflow: hidden;
+}
+
+.game-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  cursor: crosshair;
+}
+
+.hud {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  right: 12px;
+  max-width: min(780px, calc(100vw - 24px));
+  padding: 10px 12px;
+  background: var(--hud-bg);
+  border: 2px solid var(--hud-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 24px var(--shadow);
+  backdrop-filter: blur(2px);
+}
+
+.hud h1 {
+  margin: 0 0 10px;
+  font-size: clamp(0.75rem, 1.8vw, 1rem);
+}
+
+.hud p {
+  margin: 0 0 8px;
+  line-height: 1.45;
+  font-size: clamp(0.5rem, 1.15vw, 0.66rem);
+}
+
+.hotbar {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(42px, 1fr));
+  gap: 8px;
+}
+
+.hotbar-slot {
+  min-height: 52px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-radius: 9px;
+  background: var(--hotbar-slot);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.hotbar-slot.selected {
+  border-color: var(--hotbar-selected);
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.25) inset;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+.hotbar-slot .count {
+  font-size: 0.55rem;
+}
+
+@media (max-width: 720px) {
+  .hud {
+    top: auto;
+    bottom: 10px;
+  }
+
+  .hud p {
+    display: none;
+  }
+}
