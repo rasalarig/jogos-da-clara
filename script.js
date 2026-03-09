@@ -13,6 +13,7 @@ const ENEMY_SPEED = 2.2;
 const FIREBALL_SPEED = 15;
 const FIREBALL_LIFETIME = 1.2;
 const CREATIVE_BUILD = true;
+const DIAMOND_TOTAL = 7;
 
 const BLOCKS = {
   AIR: 0,
@@ -52,6 +53,21 @@ const keys = new Set();
 const mouse = { x: 0, y: 0, left: false, right: false };
 const enemies = [];
 const fireballs = [];
+const diamonds = [];
+const diamondColors = ["#22d3ee", "#ef476f", "#ffd166", "#06d6a0", "#a78bfa", "#ff9f1c", "#3a86ff"];
+
+const mission = {
+  collectedDiamonds: 0,
+  totalDiamonds: DIAMOND_TOTAL,
+  victory: false,
+  victoryMessageTimer: 0,
+  missingHint: "",
+};
+
+const finalFlag = {
+  x: WORLD_WIDTH - 12,
+  y: 8,
+};
 
 const inventory = {
   [BLOCKS.GRASS]: 99,
@@ -407,6 +423,8 @@ function createEnemy(x, y) {
     health: 3,
     direction: Math.random() < 0.5 ? -1 : 1,
     aiJumpTimer: 0,
+    guardX: x,
+    guardRange: 4,
   };
 }
 
@@ -438,6 +456,90 @@ function spawnEnemies(total) {
 
     if (trySpawnEnemyAt(x, y)) {
       created += 1;
+    }
+  }
+}
+
+function createEnemyGuarding(guardX, guardY, offsetX = 0) {
+  const enemyX = guardX + offsetX;
+  if (
+    getBlock(enemyX, guardY) === BLOCKS.AIR &&
+    getBlock(enemyX, guardY + 1) === BLOCKS.AIR &&
+    isSolid(getBlock(enemyX, guardY + 2))
+  ) {
+    const enemy = createEnemy(enemyX, guardY);
+    enemy.guardX = guardX;
+    enemy.guardRange = 5;
+    enemies.push(enemy);
+    return true;
+  }
+  return false;
+}
+
+function findSurfaceAtColumn(x) {
+  for (let y = 4; y < WORLD_HEIGHT - 4; y += 1) {
+    if (
+      getBlock(x, y) === BLOCKS.AIR &&
+      getBlock(x, y + 1) === BLOCKS.AIR &&
+      isSolid(getBlock(x, y + 2))
+    ) {
+      return y;
+    }
+  }
+  return -1;
+}
+
+function spawnDiamondWithGuards(x, color) {
+  const y = findSurfaceAtColumn(x);
+  if (y < 0) {
+    return false;
+  }
+
+  diamonds.push({
+    x,
+    y: y + 0.15,
+    width: 0.6,
+    height: 0.6,
+    color,
+    collected: false,
+  });
+
+  createEnemyGuarding(x, y, -2);
+  createEnemyGuarding(x, y, 2);
+
+  return true;
+}
+
+function spawnDiamondsAndGuards() {
+  diamonds.length = 0;
+  mission.collectedDiamonds = 0;
+  mission.missingHint = "";
+  mission.victory = false;
+
+  const segments = mission.totalDiamonds;
+  for (let i = 0; i < segments; i += 1) {
+    const segmentWidth = Math.floor((WORLD_WIDTH - 30) / segments);
+    const baseX = 14 + i * segmentWidth;
+    let placed = false;
+
+    for (let attempt = 0; attempt < 30 && !placed; attempt += 1) {
+      const offset = Math.floor(Math.random() * Math.max(4, segmentWidth - 6));
+      const x = Math.min(WORLD_WIDTH - 12, baseX + offset);
+      if (Math.abs(x - Math.floor(player.x)) < 8) {
+        continue;
+      }
+      placed = spawnDiamondWithGuards(x, diamondColors[i % diamondColors.length]);
+    }
+  }
+}
+
+function updateFinalFlagPosition() {
+  for (let x = WORLD_WIDTH - 10; x >= WORLD_WIDTH - 35; x -= 1) {
+    const y = findSurfaceAtColumn(x);
+    if (y > 0) {
+      finalFlag.x = x;
+      finalFlag.y = y;
+      return;
     }
   }
 }
@@ -520,9 +622,18 @@ function updateEnemies(dt) {
       continue;
     }
 
-    const dx = (player.x + player.width * 0.5) - (enemy.x + enemy.width * 0.5);
-    if (Math.abs(dx) < 18) {
+    const playerCenterX = player.x + player.width * 0.5;
+    const enemyCenterX = enemy.x + enemy.width * 0.5;
+    const dx = playerCenterX - enemyCenterX;
+    const nearPlayer = Math.abs(dx) < 14;
+
+    if (nearPlayer) {
       enemy.direction = dx < 0 ? -1 : 1;
+    } else {
+      const backToGuard = enemy.guardX - enemyCenterX;
+      if (Math.abs(backToGuard) > enemy.guardRange) {
+        enemy.direction = backToGuard < 0 ? -1 : 1;
+      }
     }
 
     enemy.vx = enemy.direction * ENEMY_SPEED;
@@ -542,6 +653,44 @@ function updateEnemies(dt) {
 
     if (rectanglesOverlap(player, enemy)) {
       damagePlayer(8);
+    }
+  }
+}
+
+function updateDiamondsAndFlag(dt) {
+  mission.victoryMessageTimer = Math.max(0, mission.victoryMessageTimer - dt);
+
+  if (mission.victory || player.health <= 0) {
+    return;
+  }
+
+  for (let i = 0; i < diamonds.length; i += 1) {
+    const diamond = diamonds[i];
+    if (diamond.collected) {
+      continue;
+    }
+
+    if (rectanglesOverlap(player, diamond)) {
+      diamond.collected = true;
+      mission.collectedDiamonds += 1;
+      mission.missingHint = "";
+    }
+  }
+
+  const flagBox = {
+    x: finalFlag.x + 0.2,
+    y: finalFlag.y - 1.7,
+    width: 0.6,
+    height: 1.7,
+  };
+
+  if (rectanglesOverlap(player, flagBox)) {
+    if (mission.collectedDiamonds >= mission.totalDiamonds) {
+      mission.victory = true;
+    } else {
+      const missing = mission.totalDiamonds - mission.collectedDiamonds;
+      mission.missingHint = `Faltam ${missing} diamantes para liberar a bandeira!`;
+      mission.victoryMessageTimer = 1.8;
     }
   }
 }
@@ -740,6 +889,66 @@ function drawFireballs() {
   });
 }
 
+function drawDiamonds() {
+  diamonds.forEach((diamond) => {
+    if (diamond.collected) {
+      return;
+    }
+
+    const sx = diamond.x * TILE_SIZE - camera.x;
+    const sy = diamond.y * TILE_SIZE - camera.y;
+    const w = diamond.width * TILE_SIZE;
+    const h = diamond.height * TILE_SIZE;
+
+    ctx.fillStyle = diamond.color;
+    ctx.beginPath();
+    ctx.moveTo(sx + w * 0.5, sy);
+    ctx.lineTo(sx + w, sy + h * 0.45);
+    ctx.lineTo(sx + w * 0.5, sy + h);
+    ctx.lineTo(sx, sy + h * 0.45);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillRect(sx + w * 0.4, sy + h * 0.15, 4, 4);
+  });
+}
+
+function drawFinalFlag() {
+  const poleX = finalFlag.x * TILE_SIZE - camera.x;
+  const poleY = (finalFlag.y - 2) * TILE_SIZE - camera.y;
+
+  ctx.fillStyle = "#e5e5e5";
+  ctx.fillRect(poleX, poleY, 4, TILE_SIZE * 2);
+
+  const canWin = mission.collectedDiamonds >= mission.totalDiamonds;
+  ctx.fillStyle = canWin ? "#2ec4b6" : "#ef476f";
+  ctx.fillRect(poleX + 4, poleY + 3, 20, 13);
+
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillRect(poleX + 4, poleY + 3, 20, 3);
+}
+
+function drawMissionOverlay() {
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(0,0,0,0.48)";
+  ctx.fillRect(14, 14, 430, 46);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "10px 'Press Start 2P', monospace";
+  ctx.fillText(
+    `Diamantes: ${mission.collectedDiamonds}/${mission.totalDiamonds} - Va para a bandeira`,
+    24,
+    42
+  );
+
+  if (mission.victoryMessageTimer > 0 && mission.missingHint) {
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(14, 68, 520, 34);
+    ctx.fillStyle = "#ffcf56";
+    ctx.fillText(mission.missingHint, 24, 89);
+  }
+}
+
 function drawTargetCursor() {
   const target = screenToWorld(mouse.x, mouse.y);
   const sx = target.x * TILE_SIZE - camera.x;
@@ -789,10 +998,13 @@ function renderHotbar() {
 function render() {
   drawBackground();
   drawWorld();
+  drawDiamonds();
+  drawFinalFlag();
   drawEnemies();
   drawFireballs();
   drawPlayer();
   drawTargetCursor();
+  drawMissionOverlay();
   renderHotbar();
 
   if (player.health <= 0) {
@@ -804,6 +1016,17 @@ function render() {
     ctx.fillText("Voce foi derrotada", canvas.width / 2, canvas.height / 2 - 10);
     ctx.font = "12px 'Press Start 2P', monospace";
     ctx.fillText("Recarregue para jogar novamente", canvas.width / 2, canvas.height / 2 + 20);
+  }
+
+  if (mission.victory) {
+    ctx.fillStyle = "rgba(7, 24, 36, 0.65)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "20px 'Press Start 2P', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Vitoria!", canvas.width / 2, canvas.height / 2 - 12);
+    ctx.font = "12px 'Press Start 2P', monospace";
+    ctx.fillText("Todos os diamantes coletados", canvas.width / 2, canvas.height / 2 + 18);
   }
 }
 
@@ -896,6 +1119,7 @@ function gameLoop(timestamp) {
     handleMouseActions(fixedStep);
     updateEnemies(fixedStep);
     updateFireballs(fixedStep);
+    updateDiamondsAndFlag(fixedStep);
     updateCamera();
     accumulator -= fixedStep;
   }
@@ -914,7 +1138,9 @@ function init() {
   }
 
   findSpawnPosition();
-  spawnEnemies(14);
+  spawnEnemies(5);
+  spawnDiamondsAndGuards();
+  updateFinalFlagPosition();
   updateCamera();
   renderHotbar();
 
