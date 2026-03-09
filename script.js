@@ -1,6 +1,8 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const hotbarElement = document.getElementById("hotbar");
+const characterSelectElement = document.getElementById("characterSelect");
+const touchControlsElement = document.getElementById("touchControls");
 
 const TILE_SIZE = 32;
 const WORLD_WIDTH = 240;
@@ -61,12 +63,76 @@ const mission = {
   totalDiamonds: DIAMOND_TOTAL,
   victory: false,
   victoryMessageTimer: 0,
+  completionMessageTimer: 0,
   missingHint: "",
 };
 
 const finalFlag = {
   x: WORLD_WIDTH - 12,
   y: 8,
+};
+
+const CHARACTER_STYLES = {
+  oldman: {
+    name: "Velhinho Carismatico",
+    skin: "#efc8a8",
+    hair: "#d9d9d9",
+    top: "#8d6e63",
+    bottom: "#6d4c41",
+    shoes: "#3d405b",
+    hat: "#6a8caf",
+    beard: true,
+    bodyScale: 1,
+    dress: false,
+  },
+  girl: {
+    name: "Menina de Vestido",
+    skin: "#f2c7a2",
+    hair: "#5d3b2f",
+    top: "#ff6fb5",
+    bottom: "#ff97ca",
+    shoes: "#7b2cbf",
+    hat: null,
+    beard: false,
+    bodyScale: 1,
+    dress: true,
+  },
+  boy: {
+    name: "Menino de Bone e Bermuda",
+    skin: "#edc4a3",
+    hair: "#2f3a4b",
+    top: "#2f80ed",
+    bottom: "#38bdf8",
+    shoes: "#2d3142",
+    hat: "#ef476f",
+    beard: false,
+    bodyScale: 1,
+    dress: false,
+  },
+  chubby: {
+    name: "Gordo Gente Boa",
+    skin: "#f0c2a2",
+    hair: "#3d2b1f",
+    top: "#f3722c",
+    bottom: "#f8961e",
+    shoes: "#3a0f4f",
+    hat: null,
+    beard: false,
+    bodyScale: 1.23,
+    dress: false,
+  },
+  explorer: {
+    name: "Exploradora Rapida",
+    skin: "#f0c7a8",
+    hair: "#1f2937",
+    top: "#06d6a0",
+    bottom: "#118ab2",
+    shoes: "#073b4c",
+    hat: "#f4a261",
+    beard: false,
+    bodyScale: 1,
+    dress: false,
+  },
 };
 
 const inventory = {
@@ -91,6 +157,7 @@ const player = {
   health: 100,
   fireCooldown: 0,
   damageCooldown: 0,
+  characterId: "girl",
 };
 
 const camera = {
@@ -100,10 +167,16 @@ const camera = {
 
 let hotbarDirty = true;
 let actionCooldown = 0;
+let gameStarted = false;
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+
+  if (mouse.x === 0 && mouse.y === 0) {
+    mouse.x = canvas.width * 0.5;
+    mouse.y = canvas.height * 0.5;
+  }
 }
 
 function createArray(width, height, value = 0) {
@@ -502,6 +575,7 @@ function spawnDiamondWithGuards(x, color) {
     height: 0.6,
     color,
     collected: false,
+    sparkleSeed: Math.random() * 10,
   });
 
   createEnemyGuarding(x, y, -2);
@@ -513,8 +587,10 @@ function spawnDiamondWithGuards(x, color) {
 function spawnDiamondsAndGuards() {
   diamonds.length = 0;
   mission.collectedDiamonds = 0;
+  mission.totalDiamonds = DIAMOND_TOTAL;
   mission.missingHint = "";
   mission.victory = false;
+  mission.completionMessageTimer = 0;
 
   const segments = mission.totalDiamonds;
   for (let i = 0; i < segments; i += 1) {
@@ -531,6 +607,8 @@ function spawnDiamondsAndGuards() {
       placed = spawnDiamondWithGuards(x, diamondColors[i % diamondColors.length]);
     }
   }
+
+  mission.totalDiamonds = diamonds.length;
 }
 
 function updateFinalFlagPosition() {
@@ -659,6 +737,7 @@ function updateEnemies(dt) {
 
 function updateDiamondsAndFlag(dt) {
   mission.victoryMessageTimer = Math.max(0, mission.victoryMessageTimer - dt);
+  mission.completionMessageTimer = Math.max(0, mission.completionMessageTimer - dt);
 
   if (mission.victory || player.health <= 0) {
     return;
@@ -674,6 +753,11 @@ function updateDiamondsAndFlag(dt) {
       diamond.collected = true;
       mission.collectedDiamonds += 1;
       mission.missingHint = "";
+
+      if (mission.collectedDiamonds >= mission.totalDiamonds) {
+        mission.missingHint = "Missao cumprida! Volte para a bandeira final!";
+        mission.completionMessageTimer = 3.2;
+      }
     }
   }
 
@@ -813,40 +897,64 @@ function drawWorld() {
 function drawPlayer() {
   const sx = player.x * TILE_SIZE - camera.x;
   const sy = player.y * TILE_SIZE - camera.y;
-  const w = player.width * TILE_SIZE;
+  const baseW = player.width * TILE_SIZE;
   const h = player.height * TILE_SIZE;
+  const style = CHARACTER_STYLES[player.characterId] ?? CHARACTER_STYLES.girl;
+  const drawW = baseW * style.bodyScale;
+  const drawX = sx - (drawW - baseW) * 0.5;
+  const headH = Math.floor(h * 0.35);
+  const bodyTop = sy + headH;
+  const bodyH = h - headH;
+  const headW = drawW * 0.88;
+  const headX = drawX + (drawW - headW) * 0.5;
 
-  const headHeight = Math.floor(h * 0.38);
-  const dressTop = sy + headHeight;
-  const dressHeight = h - headHeight;
+  ctx.fillStyle = style.skin;
+  ctx.fillRect(headX, sy, headW, headH);
 
-  // Cabeca
-  ctx.fillStyle = "#f2c7a2";
-  ctx.fillRect(sx, sy, w, headHeight);
+  ctx.fillStyle = style.hair;
+  ctx.fillRect(headX, sy, headW, 5);
 
-  // Vestido rosa
-  ctx.fillStyle = "#ff6fb5";
-  ctx.fillRect(sx, dressTop, w, dressHeight);
+  if (style.hat) {
+    ctx.fillStyle = style.hat;
+    ctx.fillRect(headX - 1, sy - 4, headW + 2, 4);
+    ctx.fillRect(headX + 2, sy - 7, headW - 4, 3);
+  }
 
-  ctx.fillStyle = "#ff97ca";
-  ctx.fillRect(sx, dressTop, w, 4);
+  if (style.dress) {
+    ctx.fillStyle = style.top;
+    ctx.fillRect(drawX + 1, bodyTop, drawW - 2, bodyH);
+    ctx.fillStyle = style.bottom;
+    ctx.fillRect(drawX + 1, bodyTop, drawW - 2, 4);
+  } else {
+    ctx.fillStyle = style.top;
+    ctx.fillRect(drawX + 1, bodyTop, drawW - 2, bodyH * 0.58);
+    ctx.fillStyle = style.bottom;
+    ctx.fillRect(drawX + 2, bodyTop + bodyH * 0.58, drawW - 4, bodyH * 0.42);
+  }
 
-  // Sapato roxo
-  ctx.fillStyle = "#7b2cbf";
-  ctx.fillRect(sx + 2, sy + h - 4, Math.max(5, w * 0.35), 4);
-  ctx.fillRect(sx + w - Math.max(7, w * 0.35) - 2, sy + h - 4, Math.max(5, w * 0.35), 4);
+  const shoeW = Math.max(5, drawW * 0.34);
+  ctx.fillStyle = style.shoes;
+  ctx.fillRect(drawX + 1, sy + h - 4, shoeW, 4);
+  ctx.fillRect(drawX + drawW - shoeW - 1, sy + h - 4, shoeW, 4);
 
-  ctx.fillStyle = "#293241";
-  ctx.fillRect(sx + 4, sy + 8, 5, 5);
-  ctx.fillRect(sx + w - 9, sy + 8, 5, 5);
-  ctx.fillRect(sx + 6, sy + headHeight - 5, w - 12, 3);
+  ctx.fillStyle = "#1f2937";
+  ctx.fillRect(headX + 4, sy + 8, 4, 4);
+  ctx.fillRect(headX + headW - 8, sy + 8, 4, 4);
+
+  if (style.beard) {
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(headX + 2, sy + headH - 5, headW - 4, 4);
+  } else {
+    ctx.fillStyle = "#293241";
+    ctx.fillRect(headX + 5, sy + headH - 6, headW - 10, 3);
+  }
 
   // Barra de vida em cima da personagem.
   const lifePercent = player.health / 100;
   ctx.fillStyle = "rgba(0,0,0,0.45)";
-  ctx.fillRect(sx - 2, sy - 10, w + 4, 6);
+  ctx.fillRect(drawX - 2, sy - 10, drawW + 4, 6);
   ctx.fillStyle = lifePercent > 0.3 ? "#42d96b" : "#ff595e";
-  ctx.fillRect(sx - 1, sy - 9, (w + 2) * lifePercent, 4);
+  ctx.fillRect(drawX - 1, sy - 9, (drawW + 2) * lifePercent, 4);
 }
 
 function drawEnemies() {
@@ -890,6 +998,8 @@ function drawFireballs() {
 }
 
 function drawDiamonds() {
+  const sparkleTime = performance.now() * 0.0045;
+
   diamonds.forEach((diamond) => {
     if (diamond.collected) {
       return;
@@ -899,6 +1009,17 @@ function drawDiamonds() {
     const sy = diamond.y * TILE_SIZE - camera.y;
     const w = diamond.width * TILE_SIZE;
     const h = diamond.height * TILE_SIZE;
+    const phase = sparkleTime + diamond.sparkleSeed;
+    const pulse = 0.7 + Math.sin(phase * 2.1) * 0.22;
+
+    // Halo de brilho para destacar os diamantes no mapa.
+    ctx.save();
+    ctx.globalAlpha = 0.34 * pulse;
+    ctx.fillStyle = diamond.color;
+    ctx.beginPath();
+    ctx.ellipse(sx + w * 0.5, sy + h * 0.52, w * 1.1, h * 0.92, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
     ctx.fillStyle = diamond.color;
     ctx.beginPath();
@@ -909,8 +1030,24 @@ function drawDiamonds() {
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    const sparkleAlpha = 0.45 + Math.sin(phase * 3.3) * 0.35;
+    ctx.fillStyle = `rgba(255,255,255,${Math.max(0.25, sparkleAlpha)})`;
     ctx.fillRect(sx + w * 0.4, sy + h * 0.15, 4, 4);
+
+    // Festa de brilho com particulas orbitando o diamante.
+    for (let p = 0; p < 5; p += 1) {
+      const orbit = phase * (0.9 + p * 0.15) + p * 1.2;
+      const ox = Math.cos(orbit) * (w * (0.5 + p * 0.1));
+      const oy = Math.sin(orbit * 1.3) * (h * (0.45 + p * 0.09));
+      const px = sx + w * 0.5 + ox;
+      const py = sy + h * 0.48 + oy;
+
+      ctx.fillStyle = `rgba(255,255,255,${0.2 + ((p + 1) / 10)})`;
+      ctx.fillRect(px, py, 2, 2);
+    }
+
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillRect(sx + w * 0.15, sy + h * 0.45, 3, 3);
   });
 }
 
@@ -932,7 +1069,7 @@ function drawFinalFlag() {
 function drawMissionOverlay() {
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(0,0,0,0.48)";
-  ctx.fillRect(14, 14, 430, 46);
+  ctx.fillRect(14, 14, 560, 86);
   ctx.fillStyle = "#ffffff";
   ctx.font = "10px 'Press Start 2P', monospace";
   ctx.fillText(
@@ -941,11 +1078,43 @@ function drawMissionOverlay() {
     42
   );
 
+  // Faixa superior de progresso por cor: coletado = cor original, faltando = cinza.
+  const chipSize = 18;
+  const chipStartX = 24;
+  const chipY = 56;
+  for (let i = 0; i < mission.totalDiamonds; i += 1) {
+    const diamond = diamonds[i];
+    const collected = Boolean(diamond?.collected);
+    const chipColor = collected ? diamond.color : "#6a6f7a";
+    const x = chipStartX + i * (chipSize + 10);
+
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(x - 2, chipY - 2, chipSize + 4, chipSize + 4);
+    ctx.fillStyle = chipColor;
+    ctx.fillRect(x, chipY, chipSize, chipSize);
+
+    if (!collected) {
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + 2, chipY + 2);
+      ctx.lineTo(x + chipSize - 2, chipY + chipSize - 2);
+      ctx.stroke();
+    }
+  }
+
   if (mission.victoryMessageTimer > 0 && mission.missingHint) {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(14, 68, 520, 34);
     ctx.fillStyle = "#ffcf56";
     ctx.fillText(mission.missingHint, 24, 89);
+  }
+
+  if (mission.completionMessageTimer > 0) {
+    ctx.fillStyle = "rgba(0,0,0,0.62)";
+    ctx.fillRect(14, 106, 590, 34);
+    ctx.fillStyle = "#7dffb3";
+    ctx.fillText("Missao cumprida! Todos os diamantes foram coletados!", 24, 127);
   }
 }
 
@@ -1047,6 +1216,10 @@ function findSpawnPosition() {
 }
 
 function handleKeyDown(event) {
+  if (!gameStarted) {
+    return;
+  }
+
   const key = event.key.toLowerCase();
   keys.add(key);
 
@@ -1082,6 +1255,16 @@ function setupEvents() {
     mouse.y = event.clientY;
   });
 
+  canvas.addEventListener("pointermove", (event) => {
+    mouse.x = event.clientX;
+    mouse.y = event.clientY;
+  });
+
+  canvas.addEventListener("pointerdown", (event) => {
+    mouse.x = event.clientX;
+    mouse.y = event.clientY;
+  });
+
   canvas.addEventListener("mousedown", (event) => {
     if (event.button === 0) {
       mouse.left = true;
@@ -1102,6 +1285,107 @@ function setupEvents() {
 
   canvas.addEventListener("contextmenu", (event) => {
     event.preventDefault();
+  });
+}
+
+function setTouchKeyState(key, isDown) {
+  if (!gameStarted) {
+    return;
+  }
+
+  if (isDown) {
+    keys.add(key);
+  } else {
+    keys.delete(key);
+  }
+}
+
+function setTouchActionState(action, isDown) {
+  if (!gameStarted) {
+    return;
+  }
+
+  if (mouse.x === 0 && mouse.y === 0) {
+    mouse.x = canvas.width * 0.5;
+    mouse.y = canvas.height * 0.5;
+  }
+
+  if (action === "mine") {
+    mouse.left = isDown;
+  }
+
+  if (action === "place") {
+    mouse.right = isDown;
+  }
+
+  if (action === "fire" && isDown) {
+    shootFireball();
+  }
+}
+
+function setupTouchControls() {
+  if (!touchControlsElement) {
+    return;
+  }
+
+  const buttons = touchControlsElement.querySelectorAll(".touch-btn");
+  buttons.forEach((button) => {
+    const key = button.dataset.key;
+    const action = button.dataset.action;
+
+    const press = (event) => {
+      event.preventDefault();
+      button.classList.add("active");
+      if (key) {
+        setTouchKeyState(key, true);
+      }
+      if (action) {
+        setTouchActionState(action, true);
+      }
+    };
+
+    const release = (event) => {
+      event.preventDefault();
+      button.classList.remove("active");
+      if (key) {
+        setTouchKeyState(key, false);
+      }
+      if (action === "mine" || action === "place") {
+        setTouchActionState(action, false);
+      }
+    };
+
+    button.addEventListener("pointerdown", press, { passive: false });
+    button.addEventListener("pointerup", release, { passive: false });
+    button.addEventListener("pointercancel", release, { passive: false });
+    button.addEventListener("pointerleave", release, { passive: false });
+  });
+}
+
+function startGame(characterId) {
+  if (gameStarted) {
+    return;
+  }
+
+  const selected = CHARACTER_STYLES[characterId];
+  if (!selected) {
+    return;
+  }
+
+  player.characterId = characterId;
+  gameStarted = true;
+  characterSelectElement.classList.add("hidden");
+  previousTime = performance.now();
+  accumulator = 0;
+  requestAnimationFrame(gameLoop);
+}
+
+function setupCharacterSelection() {
+  const cards = characterSelectElement.querySelectorAll(".character-card");
+  cards.forEach((card) => {
+    card.addEventListener("click", () => {
+      startGame(card.dataset.character);
+    });
   });
 }
 
@@ -1131,6 +1415,8 @@ function gameLoop(timestamp) {
 function init() {
   resizeCanvas();
   setupEvents();
+  setupCharacterSelection();
+  setupTouchControls();
 
   const generated = generateWorld();
   for (let y = 0; y < WORLD_HEIGHT; y += 1) {
@@ -1143,8 +1429,7 @@ function init() {
   updateFinalFlagPosition();
   updateCamera();
   renderHotbar();
-
-  requestAnimationFrame(gameLoop);
+  render();
 }
 
 init();

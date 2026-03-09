@@ -13,13 +13,41 @@
   <main class="game-shell">
     <canvas id="gameCanvas" aria-label="Jogo sandbox em blocos"></canvas>
 
+    <section id="characterSelect" class="character-select" aria-label="Selecao de personagem">
+      <div class="character-panel">
+        <h2>Escolha Seu Personagem</h2>
+        <p>Selecione 1 dos 5 personagens para iniciar a aventura.</p>
+        <div class="character-grid">
+          <button class="character-card" data-character="oldman">Velhinho Carismatico</button>
+          <button class="character-card" data-character="girl">Menina de Vestido</button>
+          <button class="character-card" data-character="boy">Menino de Bone e Bermuda</button>
+          <button class="character-card" data-character="chubby">Gordo Gente Boa</button>
+          <button class="character-card" data-character="explorer">Exploradora Rapida</button>
+        </div>
+      </div>
+    </section>
+
     <section class="hud" aria-live="polite">
       <h1>ClaraCraft</h1>
       <p>WASD: mover | Espaco: pular | X: bola de fogo | Clique esquerdo: minerar | Clique direito: colocar</p>
       <p>Teclas 1-6: trocar bloco da hotbar</p>
       <p>Modo construcao ativo: voce pode construir casas livremente</p>
       <p>Objetivo: colete todos os diamantes coloridos e so entao toque na bandeira final</p>
+      <p>No tablet: use os botoes na tela e toque no mapa para mirar</p>
       <div id="hotbar" class="hotbar"></div>
+    </section>
+
+    <section id="touchControls" class="touch-controls" aria-label="Controles touch">
+      <div class="touch-left">
+        <button class="touch-btn" data-key="a" aria-label="Mover para esquerda">Esq</button>
+        <button class="touch-btn" data-key="d" aria-label="Mover para direita">Dir</button>
+        <button class="touch-btn" data-key=" " aria-label="Pular">Pulo</button>
+      </div>
+      <div class="touch-right">
+        <button class="touch-btn" data-action="mine" aria-label="Minerar">Minerar</button>
+        <button class="touch-btn" data-action="place" aria-label="Colocar bloco">Bloco</button>
+        <button class="touch-btn" data-action="fire" aria-label="Bola de fogo">Fogo</button>
+      </div>
     </section>
   </main>
 

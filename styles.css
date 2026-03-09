@@ -45,6 +45,66 @@ body {
   cursor: crosshair;
 }
 
+.character-select {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 15%, rgba(255, 255, 255, 0.2), transparent 28%),
+    linear-gradient(160deg, rgba(9, 24, 40, 0.84), rgba(16, 42, 66, 0.86));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.character-select.hidden {
+  display: none;
+}
+
+.character-panel {
+  width: min(980px, 100%);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 14px;
+  padding: 18px;
+  background: rgba(6, 12, 22, 0.75);
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.35);
+}
+
+.character-panel h2 {
+  margin: 0 0 12px;
+  font-size: clamp(0.75rem, 2vw, 1rem);
+}
+
+.character-panel p {
+  margin: 0 0 16px;
+  font-size: clamp(0.5rem, 1.25vw, 0.68rem);
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.character-card {
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  border-radius: 10px;
+  min-height: 94px;
+  background: linear-gradient(180deg, rgba(83, 139, 191, 0.25), rgba(20, 35, 56, 0.6));
+  color: #ffffff;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.55rem;
+  line-height: 1.4;
+  cursor: pointer;
+  padding: 10px;
+}
+
+.character-card:hover {
+  transform: translateY(-2px);
+  border-color: #ffd166;
+}
+
 .hud {
   position: fixed;
   left: 12px;
@@ -105,7 +165,60 @@ body {
   font-size: 0.55rem;
 }
 
+.touch-controls {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 20;
+  display: none;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.touch-left,
+.touch-right {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.touch-btn {
+  min-width: 66px;
+  min-height: 56px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  background: rgba(9, 17, 28, 0.72);
+  color: #ffffff;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.5rem;
+  line-height: 1;
+  touch-action: none;
+}
+
+.touch-btn:active,
+.touch-btn.active {
+  border-color: #ffd166;
+  background: rgba(255, 209, 102, 0.24);
+}
+
+@media (pointer: coarse) {
+  .touch-controls {
+    display: flex;
+  }
+
+  .hud {
+    bottom: 84px;
+    top: auto;
+  }
+}
+
 @media (max-width: 720px) {
+  .character-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
   .hud {
     top: auto;
     bottom: 10px;
