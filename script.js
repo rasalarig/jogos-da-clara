@@ -1,6 +1,5 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-const hotbarElement = document.getElementById("hotbar");
 const characterSelectElement = document.getElementById("characterSelect");
 const touchControlsElement = document.getElementById("touchControls");
 
@@ -14,7 +13,6 @@ const REACH = 8;
 const ENEMY_SPEED = 2.2;
 const FIREBALL_SPEED = 15;
 const FIREBALL_LIFETIME = 1.2;
-const CREATIVE_BUILD = true;
 const DIAMOND_TOTAL = 7;
 
 const BLOCKS = {
@@ -40,15 +38,6 @@ const BLOCK_INFO = {
   [BLOCKS.WATER]: { name: "Agua", color: "#4f89cf", solid: false, mineable: false },
   [BLOCKS.BEDROCK]: { name: "Bedrock", color: "#3a3d43", solid: true, mineable: false },
 };
-
-const HOTBAR_BLOCKS = [
-  BLOCKS.DIRT,
-  BLOCKS.STONE,
-  BLOCKS.WOOD,
-  BLOCKS.LEAVES,
-  BLOCKS.SAND,
-  BLOCKS.GRASS,
-];
 
 const world = [];
 const keys = new Set();
@@ -135,15 +124,6 @@ const CHARACTER_STYLES = {
   },
 };
 
-const inventory = {
-  [BLOCKS.GRASS]: 99,
-  [BLOCKS.DIRT]: 160,
-  [BLOCKS.STONE]: 160,
-  [BLOCKS.WOOD]: 120,
-  [BLOCKS.LEAVES]: 120,
-  [BLOCKS.SAND]: 120,
-};
-
 const player = {
   x: 22,
   y: 16,
@@ -152,7 +132,6 @@ const player = {
   vx: 0,
   vy: 0,
   onGround: false,
-  selectedSlot: 0,
   facing: 1,
   health: 100,
   fireCooldown: 0,
@@ -165,8 +144,6 @@ const camera = {
   y: 0,
 };
 
-let hotbarDirty = true;
-let actionCooldown = 0;
 let gameStarted = false;
 
 function resizeCanvas() {
@@ -420,68 +397,6 @@ function distanceToPlayer(blockX, blockY) {
   const dx = blockX + 0.5 - cx;
   const dy = blockY + 0.5 - cy;
   return Math.hypot(dx, dy);
-}
-
-function playerIntersectsBlock(blockX, blockY) {
-  return !(
-    player.x + player.width <= blockX ||
-    player.x >= blockX + 1 ||
-    player.y + player.height <= blockY ||
-    player.y >= blockY + 1
-  );
-}
-
-function handleMouseActions(dt) {
-  actionCooldown -= dt;
-  if (actionCooldown > 0) {
-    return;
-  }
-
-  const target = screenToWorld(mouse.x, mouse.y);
-  if (distanceToPlayer(target.x, target.y) > REACH) {
-    return;
-  }
-
-  if (mouse.left) {
-    mineBlock(target.x, target.y);
-    actionCooldown = 0.12;
-  } else if (mouse.right) {
-    placeBlock(target.x, target.y);
-    actionCooldown = 0.12;
-  }
-}
-
-function mineBlock(x, y) {
-  const block = getBlock(x, y);
-  const info = BLOCK_INFO[block];
-  if (!info.mineable) {
-    return;
-  }
-
-  setBlock(x, y, BLOCKS.AIR);
-  inventory[block] = (inventory[block] ?? 0) + 1;
-  hotbarDirty = true;
-}
-
-function placeBlock(x, y) {
-  if (getBlock(x, y) !== BLOCKS.AIR) {
-    return;
-  }
-
-  if (playerIntersectsBlock(x, y)) {
-    return;
-  }
-
-  const selectedBlock = HOTBAR_BLOCKS[player.selectedSlot];
-  if (!CREATIVE_BUILD && (inventory[selectedBlock] ?? 0) <= 0) {
-    return;
-  }
-
-  setBlock(x, y, selectedBlock);
-  if (!CREATIVE_BUILD) {
-    inventory[selectedBlock] -= 1;
-  }
-  hotbarDirty = true;
 }
 
 function createEnemy(x, y) {
@@ -819,9 +734,6 @@ function updateFireballs(dt) {
       const blockY = Math.floor(fireball.y);
       const hitBlock = getBlock(blockX, blockY);
       if (hitBlock !== BLOCKS.AIR) {
-        if (BLOCK_INFO[hitBlock].mineable) {
-          setBlock(blockX, blockY, BLOCKS.AIR);
-        }
         hit = true;
         break;
       }
@@ -1118,16 +1030,6 @@ function drawMissionOverlay() {
   }
 }
 
-function drawTargetCursor() {
-  const target = screenToWorld(mouse.x, mouse.y);
-  const sx = target.x * TILE_SIZE - camera.x;
-  const sy = target.y * TILE_SIZE - camera.y;
-
-  ctx.strokeStyle = distanceToPlayer(target.x, target.y) <= REACH ? "#ffffff" : "#ff6666";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-}
-
 function drawBackground() {
   const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
   sky.addColorStop(0, "#9ed9ff");
@@ -1135,33 +1037,6 @@ function drawBackground() {
   sky.addColorStop(1, "#f5f6ff");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-}
-
-function renderHotbar() {
-  if (!hotbarDirty) {
-    return;
-  }
-
-  hotbarElement.innerHTML = "";
-
-  HOTBAR_BLOCKS.forEach((blockId, index) => {
-    const slot = document.createElement("div");
-    slot.className = `hotbar-slot ${index === player.selectedSlot ? "selected" : ""}`;
-
-    const swatch = document.createElement("div");
-    swatch.className = "swatch";
-    swatch.style.background = BLOCK_INFO[blockId].color;
-
-    const count = document.createElement("div");
-    count.className = "count";
-    count.textContent = `${index + 1}: ${inventory[blockId] ?? 0}`;
-
-    slot.appendChild(swatch);
-    slot.appendChild(count);
-    hotbarElement.appendChild(slot);
-  });
-
-  hotbarDirty = false;
 }
 
 function render() {
@@ -1172,9 +1047,7 @@ function render() {
   drawEnemies();
   drawFireballs();
   drawPlayer();
-  drawTargetCursor();
   drawMissionOverlay();
-  renderHotbar();
 
   if (player.health <= 0) {
     ctx.fillStyle = "rgba(0,0,0,0.5)";
@@ -1226,12 +1099,6 @@ function handleKeyDown(event) {
   if (key === "x") {
     shootFireball();
   }
-
-  const slot = Number.parseInt(key, 10);
-  if (slot >= 1 && slot <= HOTBAR_BLOCKS.length) {
-    player.selectedSlot = slot - 1;
-    hotbarDirty = true;
-  }
 }
 
 function handleKeyUp(event) {
@@ -1266,21 +1133,13 @@ function setupEvents() {
   });
 
   canvas.addEventListener("mousedown", (event) => {
-    if (event.button === 0) {
-      mouse.left = true;
-    }
-    if (event.button === 2) {
-      mouse.right = true;
-    }
+    mouse.x = event.clientX;
+    mouse.y = event.clientY;
   });
 
   window.addEventListener("mouseup", (event) => {
-    if (event.button === 0) {
-      mouse.left = false;
-    }
-    if (event.button === 2) {
-      mouse.right = false;
-    }
+    mouse.x = event.clientX;
+    mouse.y = event.clientY;
   });
 
   canvas.addEventListener("contextmenu", (event) => {
@@ -1308,14 +1167,6 @@ function setTouchActionState(action, isDown) {
   if (mouse.x === 0 && mouse.y === 0) {
     mouse.x = canvas.width * 0.5;
     mouse.y = canvas.height * 0.5;
-  }
-
-  if (action === "mine") {
-    mouse.left = isDown;
-  }
-
-  if (action === "place") {
-    mouse.right = isDown;
   }
 
   if (action === "fire" && isDown) {
@@ -1349,9 +1200,6 @@ function setupTouchControls() {
       button.classList.remove("active");
       if (key) {
         setTouchKeyState(key, false);
-      }
-      if (action === "mine" || action === "place") {
-        setTouchActionState(action, false);
       }
     };
 
@@ -1400,7 +1248,6 @@ function gameLoop(timestamp) {
 
   while (accumulator >= fixedStep) {
     updatePlayer(fixedStep);
-    handleMouseActions(fixedStep);
     updateEnemies(fixedStep);
     updateFireballs(fixedStep);
     updateDiamondsAndFlag(fixedStep);
@@ -1428,7 +1275,6 @@ function init() {
   spawnDiamondsAndGuards();
   updateFinalFlagPosition();
   updateCamera();
-  renderHotbar();
   render();
 }
 
