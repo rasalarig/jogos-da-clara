@@ -145,6 +145,7 @@ const camera = {
 };
 
 let gameStarted = false;
+let actionCooldown = 0;
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -397,6 +398,63 @@ function distanceToPlayer(blockX, blockY) {
   const dx = blockX + 0.5 - cx;
   const dy = blockY + 0.5 - cy;
   return Math.hypot(dx, dy);
+}
+
+function playerIntersectsBlock(blockX, blockY) {
+  return !(
+    player.x + player.width <= blockX ||
+    player.x >= blockX + 1 ||
+    player.y + player.height <= blockY ||
+    player.y >= blockY + 1
+  );
+}
+
+function mineBlock(x, y) {
+  const block = getBlock(x, y);
+  const info = BLOCK_INFO[block];
+  if (!info?.mineable) {
+    return;
+  }
+  setBlock(x, y, BLOCKS.AIR);
+}
+
+function placeBlock(x, y) {
+  if (getBlock(x, y) !== BLOCKS.AIR) {
+    return;
+  }
+
+  if (playerIntersectsBlock(x, y)) {
+    return;
+  }
+
+  setBlock(x, y, BLOCKS.DIRT);
+}
+
+function handleBuildActions(dt) {
+  actionCooldown -= dt;
+  if (actionCooldown > 0) {
+    return;
+  }
+
+  if (!mouse.left && !mouse.right) {
+    return;
+  }
+
+  const target = screenToWorld(mouse.x, mouse.y);
+  if (distanceToPlayer(target.x, target.y) > REACH) {
+    return;
+  }
+
+  if (mouse.left) {
+    mineBlock(target.x, target.y);
+    actionCooldown = 0.12;
+    return;
+  }
+
+  if (mouse.right) {
+    placeBlock(target.x, target.y);
+    actionCooldown = 0.12;
+  }
 }
 
 function createEnemy(x, y) {
@@ -1135,11 +1193,23 @@ function setupEvents() {
   canvas.addEventListener("mousedown", (event) => {
     mouse.x = event.clientX;
     mouse.y = event.clientY;
+    if (event.button === 0) {
+      mouse.left = true;
+    }
+    if (event.button === 2) {
+      mouse.right = true;
+    }
   });
 
   window.addEventListener("mouseup", (event) => {
     mouse.x = event.clientX;
     mouse.y = event.clientY;
+    if (event.button === 0) {
+      mouse.left = false;
+    }
+    if (event.button === 2) {
+      mouse.right = false;
+    }
   });
 
   canvas.addEventListener("contextmenu", (event) => {
@@ -1172,6 +1242,14 @@ function setTouchActionState(action, isDown) {
   if (action === "fire" && isDown) {
     shootFireball();
   }
+
+  if (action === "mine") {
+    mouse.left = isDown;
+  }
+
+  if (action === "place") {
+    mouse.right = isDown;
+  }
 }
 
 function setupTouchControls() {
@@ -1200,6 +1278,9 @@ function setupTouchControls() {
       button.classList.remove("active");
       if (key) {
         setTouchKeyState(key, false);
+      }
+      if (action === "mine" || action === "place") {
+        setTouchActionState(action, false);
       }
     };
 
@@ -1248,6 +1329,7 @@ function gameLoop(timestamp) {
 
   while (accumulator >= fixedStep) {
     updatePlayer(fixedStep);
+    handleBuildActions(fixedStep);
     updateEnemies(fixedStep);
     updateFireballs(fixedStep);
     updateDiamondsAndFlag(fixedStep);
